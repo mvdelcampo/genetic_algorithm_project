@@ -1,5 +1,5 @@
 import time
-from utils import is_inrange
+from utils import is_inrange, is_num_cores_valid
 # add imports from functions.py
 # add import from utils (check for positive int. etc.)
 
@@ -16,10 +16,26 @@ def adjust_execution_settings(state):
     '''
     Reads: current num cores.
     Modifies: num cores
-    Error handling: Only positive value + integer, very big integer not valid. 
+    Error handling: Only positive value + integer, bigger integer than available cores not valid. 
                     If so, keep prev num cores.
     '''
-    print("Option 2 not implemented yet.")
+    print(f"\nCurrent number of cores: {state["num_cores"]}")
+
+    while True:
+        num_cores = input("Enter the new number of cores to be used for parallel running (or 'b' to fo back to the main menu): ").strip()
+
+        if num_cores.lower() == "b":
+            print("No changes made. Returning to the main menu.")
+            return
+
+        if is_num_cores_valid(num_cores):
+            state["num_cores"] = int(num_cores)
+            print("The number of cores has been successfully updated.")
+            return
+        else:
+            print("The provided number of cores is not valid, either because it is not a positive integer or the computer does not have so many cores available.")
+
+        
 
 
 def run_all(state):
@@ -122,7 +138,8 @@ def cli_menu():
     while quit == False:
         print_options()
         option = choose_option()
-        options_dict[f"{option}"](state)
+        chosen_function= options_dict[f"{option}"]
+        chosen_function(state)
 
         
 if __name__ == "__main__":
