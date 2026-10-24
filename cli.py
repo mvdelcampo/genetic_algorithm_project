@@ -1,5 +1,6 @@
 import time
-from utils import is_inrange, is_num_cores_valid
+from utils import is_inrange, is_num_cores_valid, write_to_file
+
 # add imports from functions.py
 # add import from utils (check for positive int. etc.)
 
@@ -63,7 +64,13 @@ def export_results(state):
     Builds: output file + performance plot (best fitness over time) & (problem size vs time to optimal)
     Error handling: Nothing executed yet
     '''
-    print("Option 5 not implemented yet.")
+    file_name = state["output_config"]["save_to_file"]
+
+    print("The results will be saved in the 'output' folder.\nThe configurated file name is", file_name)
+    
+    write_to_file(file_name, "test")
+
+    return
 
 
 def exit_program(state):
@@ -83,7 +90,7 @@ def current_state():
         "runs": [],           
         "history": [],
         "num_cores": 1,
-        "output_config": {},
+        "output_config": {"save_to_file": "test.json"},
         "total_time": 0.0, 
         "unsaved_results": False
     }
