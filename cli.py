@@ -90,7 +90,7 @@ def current_state():
         "runs": [],           
         "history": [],
         "num_cores": 1,
-        "output_config": {"save_to_file": "test.json"},
+        "output_config": {"save_to_file": "test3.json"},
         "total_time": 0.0, 
         "unsaved_results": False
     }
@@ -145,8 +145,8 @@ def cli_menu():
     while quit == False:
         print_options()
         option = choose_option()
-        chosen_function= options_dict[f"{option}"]
-        chosen_function(state)
+        options_dict[f"{option}"](state)
+        
 
         
 if __name__ == "__main__":
