@@ -1,8 +1,8 @@
-import time
+import multiprocessing
 from utils import is_inrange, is_num_cores_valid, write_to_file, can_plot, plot_performance
+from functions import solve_run
+import time
 
-# add imports from functions.py
-# add import from utils (check for positive int. etc.)
 
 def load_problem(state):
     '''
@@ -45,7 +45,35 @@ def run_all(state):
     Modifies: history, state of each run, running time p-run + total time.
     Error handling: Nothing loaded, nothing pending, errors inside a run, everything run already
     '''
-    print("Option 3 not implemented yet.")
+    if not state["runs"]:
+        print("There is no problem loaded yet. \nPress 1 to load a problem.")
+        return 
+    
+    pending = []
+    for run in state["runs"]:
+        if run["status"] == "Pending":
+            pending.append(run)
+    if len(pending) == 0:
+        print("All runs have been executed. Load another problem to execute more runs.")
+        return 
+
+    print(f"Running {len(pending)} runs on {state["num_cores"]} cores")
+
+    start_time = time.time()
+    with multiprocessing.Pool(processes=state["num_cores"]) as pool:
+        results = pool.map(solve_run, pending)
+    state["total_time"] = state["total_time"] + (time.time() - start_time)
+
+    for run_id, best_fitness, running_time in results:
+        for run in state["runs"]:
+            if run_id == run["run_id"]:
+                run["best_fitness"] = best_fitness
+                run["running_time"] = running_time
+                run["status"] = "Finished" if best_fitness is not None else "Failed"
+
+    state["unsaved_results"] = True
+
+    return state
 
 
 def check_status(state):
@@ -210,6 +238,15 @@ def exit_program(state):
     Stops the loop returning boolean.
     Error handling: Warn about non-exported results before exit
     '''
+    if state["unsaved_results"] == True:
+        print("Warning. You have not exported the results yet. \nAre you sure you want to exit the program?\n")
+        decision = input("Type 'y' if you want to exit, 'n' if you want to stay: ")
+        if decision.lower() == "y":
+            quit = True
+        else:
+            quit = False
+            return quit
+
     quit = True
     return quit
     
@@ -219,8 +256,7 @@ def current_state():
     Returns initial state: runs, history, cores, time...
     '''
     state = {
-        "runs": [],           
-        "history": [],
+        "runs": [],
         "num_cores": 1,
         "output": {"save_to_file": "test3.json"},
         "total_time": 0.0, 
@@ -253,7 +289,7 @@ def choose_option():
     option = input("\nWhich option would you like to execute?: ").strip()
     while not is_inrange(option):
         option = input("\nWhich option would you like to execute?: ").strip()
-    print("\nExecuting option", option, ".")
+    print(f"\nExecuting option {option}.")
     return option
 
 
@@ -277,9 +313,8 @@ def cli_menu():
     while quit == False:
         print_options()
         option = choose_option()
-        options_dict[f"{option}"](state)
+        quit = options_dict[f"{option}"](state) is True
         
-
         
 if __name__ == "__main__":
     cli_menu()
