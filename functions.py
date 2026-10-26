@@ -43,7 +43,7 @@ def fitness_onemax(individual):
 
 
 # MATING POOL FUNCTION
-def mating_pool(population, fitness_function):
+def generate_mating_pool(population, fitness_function, *args):
     indexes = [x for x in range(len(population))] 
     comparisons = []
     mating_pool = []
@@ -55,7 +55,7 @@ def mating_pool(population, fitness_function):
             comparisons.append(tupla)
 
     for tupla in comparisons:
-        if (fitness_function(population[tupla[0]]) > fitness_function(population[tupla[1]])):
+        if (fitness_function(population[tupla[0]], *args) > fitness_function(population[tupla[1]], *args)):
             mating_pool.append(population[tupla[0]])
         else:
             mating_pool.append(population[tupla[1]])
@@ -119,13 +119,14 @@ def run_genetic_algorithm(population_size,
                           individual_generator, 
                           fitness_function,
                           crossover_function,
-                          mutation_function):
+                          mutation_function,
+                          *args):
     population = generate_population(population_size, individual_generator, individual_size)
     best_fitness = 0
     best_individual = None
     individuals_evaluated = 0
     for i in range(num_generations):
-        mating_pool = mating_pool(population, population_size, fitness_function)
+        mating_pool = generate_mating_pool(population, fitness_function, *args)
         individuals_evaluated += len(mating_pool)
         new_population = []
         population = []
@@ -136,7 +137,7 @@ def run_genetic_algorithm(population_size,
         for j in range(len(new_population)):
             individual = mutation_function(new_population[j], mutation_rate)
             population.append(individual)
-            fitness = fitness_function(individual)
+            fitness = fitness_function(individual, *args)
             if fitness > best_fitness:
                 best_fitness = fitness
                 best_individual = individual
@@ -153,14 +154,14 @@ def build_distances_matrix(city_coordinates):
             x1, y1 = city_coordinates[i]
             x2, y2 = city_coordinates[j]
 
-            distance_ij = ((x2 - x1)*2 + (y2 - y1)*2) * 0.5
+            distance_ij = ((x2 - x1)**2 + (y2 - y1)**2) ** 0.5
             distances[i][j] = distance_ij
 
     return distances
 
 
 # RANDOM SEARCH
-def random_search(size, time_limit = 3.0):
+def random_search(size, distances, time_limit = 3.0):
     routes_tried = 0
     fitness = 0
     best_distance = 1e06
@@ -168,9 +169,41 @@ def random_search(size, time_limit = 3.0):
     while (time.time() - start_time) < time_limit: # and fitness < size --> OPCION
         routes_tried+=1
         route = generate_individual_permutation(size)
-        fitness = fitness_tsp(route)
+        fitness = fitness_tsp(route, distances)
         distance = 1/fitness
         if distance < best_distance:
             best_distance = distance
 
     return routes_tried, best_distance
+
+
+# SOLVE RUN FOR MULTIPROCESSING
+def solve_run(run):
+    start_time = time.time()
+    best_fitness = None
+
+    try:
+        if run["type"] == "onemax":
+            _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
+                                                       run["gene_length"],
+                                                       run["num_generations"],
+                                                       run["mutation_rate"],
+                                                       generate_individual,
+                                                       fitness_onemax,
+                                                       crossover_bitstring,
+                                                       mutate_bitstring)
+        else:
+            _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
+                                                       len(run["cities"]),
+                                                       run["num_generations"],
+                                                       run["mutation_rate"],
+                                                       generate_individual_permutation,
+                                                       fitness_tsp,
+                                                       crossover_permutation,
+                                                       swap_mutation,
+                                                       run["distance_matrix"])
+    except Exception as error:
+        print(f"Run {run["run_id"]} failed: {error}")
+
+    running_time = time.time() - start_time
+    return run["run_id"], best_fitness, running_time
