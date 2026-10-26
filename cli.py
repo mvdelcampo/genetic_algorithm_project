@@ -1,8 +1,8 @@
-import time
+import multiprocessing
 from utils import is_inrange, is_num_cores_valid, write_to_file
+from functions import solve_run
+import time
 
-# add imports from functions.py
-# add import from utils (check for positive int. etc.)
 
 def load_problem(state):
     '''
@@ -45,7 +45,35 @@ def run_all(state):
     Modifies: history, state of each run, running time p-run + total time.
     Error handling: Nothing loaded, nothing pending, errors inside a run, everything run already
     '''
-    print("Option 3 not implemented yet.")
+    if not state["runs"]:
+        print("There is no problem loaded yet. \nPress 1 to load a problem.")
+        return 
+    
+    pending = []
+    for run in state["runs"]:
+        if run["status"] == "Pending":
+            pending.append(run)
+    if len(pending) == 0:
+        print("All runs have been executed. Load another problem to execute more runs.")
+        return 
+
+    print(f"Running {len(pending)} runs on {state["num_cores"]} cores")
+
+    start_time = time.time()
+    with multiprocessing.Pool(processes=state["num_cores"]) as pool:
+        results = pool.map(solve_run, pending)
+    state["total_time"] = state["total_time"] + (time.time() - start_time)
+
+    for run_id, best_fitness, running_time in results:
+        for run in state["runs"]:
+            if run_id == run["run_id"]:
+                run["best_fitness"] = best_fitness
+                run["running_time"] = running_time
+                run["status"] = "Finished" if best_fitness is not None else "Failed"
+
+    state["unsaved_results"] = True
+
+    return state
 
 
 def check_status(state):
@@ -67,7 +95,7 @@ def export_results(state):
     file_name = state["output_config"]["save_to_file"]
 
     print("The results will be saved in the 'output' folder.\nThe configurated file name is", file_name)
-    
+
     write_to_file(file_name, "test")
 
     return
@@ -87,8 +115,7 @@ def current_state():
     Returns initial state: runs, history, cores, time...
     '''
     state = {
-        "runs": [],           
-        "history": [],
+        "runs": [],
         "num_cores": 1,
         "output_config": {"save_to_file": "test3.json"},
         "total_time": 0.0, 
