@@ -106,6 +106,15 @@ def exit_program(state):
     Stops the loop returning boolean.
     Error handling: Warn about non-exported results before exit
     '''
+    if state["unsaved_results"] == True:
+        print("Warning. You have not exported the results yet. \nAre you sure you want to exit the program?\n")
+        decision = input("Type 'y' if you want to exit, 'n' if you want to stay: ")
+        if decision.lower() == "y":
+            quit = True
+        else:
+            quit = False
+            return quit
+
     quit = True
     return quit
     
@@ -148,7 +157,7 @@ def choose_option():
     option = input("\nWhich option would you like to execute?: ").strip()
     while not is_inrange(option):
         option = input("\nWhich option would you like to execute?: ").strip()
-    print("\nExecuting option", option, ".")
+    print(f"\nExecuting option {option}.")
     return option
 
 
@@ -172,9 +181,8 @@ def cli_menu():
     while quit == False:
         print_options()
         option = choose_option()
-        options_dict[f"{option}"](state)
+        quit = options_dict[f"{option}"](state) is True
         
-
         
 if __name__ == "__main__":
     cli_menu()
