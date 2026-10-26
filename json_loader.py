@@ -87,3 +87,19 @@ def expand_problem_runs(problem_id, problem_type, problem_data):
         counter += 1
 
     return runs
+
+
+def prepare_runs(file_path):
+    json_data = load_json_file(file_path)
+
+    if json_data is None:
+        return []
+
+    problems = extract_problems(json_data)
+    all_runs = []
+
+    for problem_id, problem_type, problem_data in problems:
+        runs = expand_problem_runs(problem_id, problem_type, problem_data)
+        all_runs.extend(runs)
+
+    return all_runs
