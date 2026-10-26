@@ -1,5 +1,5 @@
 import multiprocessing
-from utils import is_inrange, is_num_cores_valid, write_to_file
+from utils import is_inrange, is_num_cores_valid, write_to_file, can_plot, plot_performance
 from functions import solve_run
 import time
 
@@ -89,17 +89,149 @@ def check_status(state):
 def export_results(state):
     '''
     Reads: final history + output configs
-    Builds: output file + performance plot (best fitness over time) & (problem size vs time to optimal)
+    Builds: output file + performance plot
     Error handling: Nothing executed yet
     '''
-    file_name = state["output_config"]["save_to_file"]
+    # harcoded state to test
+    state = {"runs": [{ "run_id": "onemax_1_run_1",
+                        "problem_id": "onemax_1",
+                        "type": "onemax",
+                        "population_size": 20, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.1, 
+                        "gene_length": 10, 
+                        "known_optimal": 10,
+                        "best_fitness_found": 10,
+                        "running_time": 2.2,
+                        "status": "finished"
+                        },
+                        { "run_id": "onemax_2_run_2",
+                        "problem_id": "onemax_2",
+                        "type": "onemax",
+                        "population_size": 10, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.1, 
+                        "gene_length": 11, 
+                        "known_optimal": 11,
+                        "best_fitness_found": 10,
+                        "running_time": 3.2,
+                        "status": "finished"
+                        },
+                        { "run_id": "onemax_3_run_3",
+                        "problem_id": "onemax_3",
+                        "type": "onemax",
+                        "population_size": 20, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.05, 
+                        "gene_length": 15, 
+                        "known_optimal": 15,
+                        "best_fitness_found": 15,
+                        "running_time": 3.5,
+                        "status": "finished"
+                        },
+                        { "run_id": "onemax_4_run_4",
+                        "problem_id": "onemax_4",
+                        "type": "onemax",
+                        "population_size": 50, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.1, 
+                        "gene_length": 11, 
+                        "known_optimal": 11,
+                        "best_fitness_found": 11,
+                        "running_time": 3.8,
+                        "status": "finished"
+                        },
+                        { "run_id": "onemax_5_run_5",
+                        "problem_id": "onemax_5",
+                        "type": "onemax",
+                        "population_size": 50, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.2, 
+                        "gene_length": 15, 
+                        "known_optimal": 15,
+                        "best_fitness_found": 15,
+                        "running_time": 4.0,
+                        "status": "finished"
+                        },
+                        { "run_id": "onemax_6_run_6",
+                        "problem_id": "onemax_6",
+                        "type": "onemax",
+                        "population_size": 20, 
+                        "num_generations": 30, 
+                        "mutation_rate": 0.05, 
+                        "gene_length": 13, 
+                        "known_optimal": 13,
+                        "best_fitness_found": 13,
+                        "running_time": 3.8,
+                        "status": "finished"
+                        },
+                        {"run_id": "tsp_1_run_1",
+                        "problem_id": "tsp_1",
+                        "type": "tsp",
+                        "population_size": 50, 
+                        "num_generations": 200, 
+                        "mutation_rate": 0.2, 
+                        "cities": [[17, 72], [97, 8], [32, 15], [63, 97]],
+                        "known_optimal": 303,
+                        "best_fitness_found": 303,
+                        "running_time": 5.6,
+                        "status": "finished"
+                        },
+                        { "run_id": "tsp_2_run_2",
+                        "problem_id": "tsp_2",
+                        "type": "tsp",
+                        "population_size": 30, 
+                        "num_generations": 200, 
+                        "mutation_rate": 0.1, 
+                        "cities": [[17, 72], [97, 8], [32, 15]],
+                        "known_optimal": 296,
+                        "best_fitness_found": 296,
+                        "running_time": 6.1,
+                        "status": "finished"
+                        },
+                        {"run_id": "tsp_3_run_3",
+                        "problem_id": "tsp_3",
+                        "type": "tsp",
+                        "population_size": 50, 
+                        "num_generations": 200, 
+                        "mutation_rate": 0.2, 
+                        "cities": [[17, 72], [97, 8], [32, 15], [63, 97], [10, 10]],
+                        "known_optimal": 303,
+                        "best_fitness_found": 303,
+                        "running_time": 6,
+                        "status": "finished"
+                        },
+            ],
+            # "history": [],
+            "num_cores": 1,
+            "output": {"save_to_file": "history.txt",
+                        "performance_plot": True},
+            "total_time": 0.0, 
+            "unsaved_results": False
+        }
 
+    # error handling if any key is not present is done in load_problem
+    
+    # save history to file
+    file_name = state["output"]["save_to_file"]
     print("The results will be saved in the 'output' folder.\nThe configurated file name is", file_name)
+    write_to_file(file_name, state["runs"])
 
-    write_to_file(file_name, "test")
+    # performance plot
+    if state["output"]["performance_plot"] is True:
+        runs = state["runs"]
+        plottable_types = []
+        for problem_type in sorted({run["type"] for run in runs}):
+            if can_plot(runs, problem_type):
+                plottable_types.append(problem_type)
+            else:
+                print(f"Plot of {problem_type} cannot be generated:\n user should load at least 2 problems with different problem size (gene_length or number of cities) and a known_optimal.")
+
+        if plottable_types:
+            plot_path = plot_performance(runs, plottable_types, "output")
+            print(f"Performance plot saved in {plot_path}.")
 
     return
-
 
 def exit_program(state):
     '''
@@ -126,7 +258,7 @@ def current_state():
     state = {
         "runs": [],
         "num_cores": 1,
-        "output_config": {"save_to_file": "test3.json"},
+        "output": {"save_to_file": "test3.json"},
         "total_time": 0.0, 
         "unsaved_results": False
     }

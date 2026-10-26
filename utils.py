@@ -1,5 +1,7 @@
 from os import process_cpu_count
 from pathlib import Path
+import matplotlib.pyplot as plt
+from json import dumps
 
 def is_inrange(n):
     if n not in ["1", "2", "3", "4", "5", "6"]:
@@ -178,12 +180,130 @@ def write_to_file(file_name, content):
     '''
 
     Path("output").mkdir(parents=True, exist_ok=True)
-
     route = Path("output") / file_name # / operator joins routes
+    extension = route.suffix.lower()
 
-    route.write_text(content, encoding="utf-8")
+    if extension == ".json":
+        route.write_text(dumps(content, indent=4, ensure_ascii=False), encoding="utf-8")
+    else:
+        # assumes .txt or any other extension: readable plain text, one block per run
+        lines = []
+        for run in content:
+            for key, value in run.items():
+                lines.append(f"{key}: {value}")
+            lines.append("")
+        route.write_text("\n".join(lines), encoding="utf-8")
 
     return route
 
+def get_problem_size(run):
+    """
+        Returns N depending on the type of problem.
+    """
+    if run["type"] == "onemax":
+        return run["gene_length"]
+    if run["type"] == "tsp":
+        return len(run["cities"])
+    return None
+
+def get_plottable_runs(runs, problem_type):
+    """
+        Returns runs of the same type, finished and with known_optimal.
+    """
+    return [
+        run for run in runs
+        if run["type"] == problem_type
+        and run["status"] == "finished"
+        and run.get("known_optimal") is not None
+    ]
+
+def can_plot(runs, problem_type):
+    """
+        Checks if the conditions to plot are satisfied and returns the corresponding boolean.
+        (If there are at least two different problem_sizes between the plottable runs)
+    """
+    sizes = {get_problem_size(run) for run in get_plottable_runs(runs, problem_type)}
+    return len(sizes) >= 2
+
+def get_configurations_tuple(run):
+    """
+        Returns the configuration tuple of parameters of a run
+    """
+    return (run["population_size"], run["num_generations"], run["mutation_rate"])
+
+def plot_problem(ax, runs, problem_type):
+    """
+        Draws problem_size (N) vs running_time until known_optimal of one problem type in the given ax.
+    """
+    plottable_runs = get_plottable_runs(runs, problem_type)
+
+    # group runs by configuration
+    groups = {}
+    for run in plottable_runs:
+        key = get_configurations_tuple(run)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(run)
+
+    for key, configurations in groups.items():
+        population_size, num_generations, mutation_rate = key
+        label = f"pop={population_size}, gen={num_generations}, mut={mutation_rate}"
+
+        # separate runs that reached the optimum from the ones that didnt
+        reached = []
+        failed = []
+        for run in configurations:
+            if run.get("known_optimal") == run.get("best_fitness_found"):
+                reached.append(run)
+            else:
+                failed.append(run)
+
+        # lines with the runs that reached the optimum, ordered by N
+        reached.sort(key=get_problem_size)
+        x = [get_problem_size(run) for run in reached]
+        y = [run["running_time"] for run in reached]
+        line = ax.plot(x, y, marker="o", label=label)[0]
+
+        # adds an 'X' of same color to the ones that didnt reach the optimum
+        x_failed = [get_problem_size(run) for run in failed]
+        y_failed = [run["running_time"] for run in failed]
+        ax.scatter(x_failed, y_failed, marker="x", s=80, color=line.get_color())
+
+    # plot format
+
+    # keep only actual sizes in x axis
+    sizes = [get_problem_size(run) for run in plottable_runs]
+    ax.set_xticks(range(min(sizes), max(sizes) + 1))
+
+    ax.set_xlabel(f"N: problem size ({'gene_length' if problem_type == 'onemax' else 'number of cities'})")
+    ax.set_ylabel("Time to reach optimum (s)")
+    ax.set_title(f"{problem_type.upper()}: time to reach optimum vs N")
+    ax.grid(alpha=0.3)
+
+    # add legend entry explaining the 'X' marker
+    ax.scatter([], [], marker="x", s=80, color="black", label="didn't reach optimum")
+
+    # legend below the subplot
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15))
 
 
+def plot_performance(runs, problem_types, output_dir, show=True):
+    """
+        Generates one subplot per problem type in the same figure, saves it in a PNG and returns the route.
+    """
+    fig, axes = plt.subplots(1, len(problem_types), figsize=(7 * len(problem_types), 6),
+                             layout="constrained", squeeze=False)
+
+    for ax, problem_type in zip(axes[0], problem_types):
+        plot_problem(ax, runs, problem_type)
+
+    # save and close
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    plot_path = Path(output_dir) / "performance_plot.png"
+    fig.savefig(plot_path)
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
+    return plot_path
