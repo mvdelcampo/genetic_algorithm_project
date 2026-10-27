@@ -26,7 +26,7 @@ def load_problem(state, file_path):
 
         cores = json_data.get('num_cores', state['num_cores'])
         if not is_num_cores_valid(str(cores)):
-            print("Invalid number of cores.")
+            print("Invalid number of cores.\n It is not a positive integer or the computer does not have that many cores available.")
             return state
 
         output = json_data.get('output', state['output']) # TODO: si no hay output no toma el dict vacio y lo va a dar como valido?
@@ -78,7 +78,7 @@ def adjust_execution_settings(state):
             print('The number of cores has been successfully updated.')
             return state
 
-        print('The provided number of cores is not valid, either because it is not a positive integer or the computer does not have so many cores available.')
+        print('The provided number of cores is not valid, either because it is not a positive integer or the computer does not have that many cores available.')
 
 
 def run_all(state):
@@ -162,6 +162,9 @@ def check_status(state):
 
         if run.get('known_optimal') is not None:
             print(f"Known optimal: {run['known_optimal']}")
+
+        if run.get('elite_size') is not None:
+                    print(f"Elite size: {run['elite_size']}")
 
         if run['status'] == 'Finished':
             print(f"Best fitness: {run['best_fitness']}")

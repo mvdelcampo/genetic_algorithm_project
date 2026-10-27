@@ -2,8 +2,6 @@ from os import process_cpu_count
 from pathlib import Path
 import matplotlib.pyplot as plt
 from json import dumps
-from matplotlib.widgets import Button
-from pathlib import Path
 import math
 
 def is_inrange(n):
@@ -17,7 +15,7 @@ def validate_json_data(json_data):
     problems = []
     required_onemax = {"population_size", "num_generations", "mutation_rate", "gene_length"}
     required_tsp = {"population_size", "num_generations", "mutation_rate", "cities"}
-    optional_problem = {"known_optimal"}
+    optional_problem = {"known_optimal", "elite_size"}
     optional_general = {"num_cores", "output"}
     allowed_groups = {"onemax_problems", "tsp_problems"}
 
@@ -103,6 +101,8 @@ def validate_json_data(json_data):
             for item in values:
                 if key == "mutation_rate":
                     valid = type(item) in (int, float) and 0 < item <= 1
+                elif key == "population_size":
+                    valid = type(item) is int and item >= 2
                 else:
                     valid = type(item) is int and item > 0
 
@@ -144,6 +144,12 @@ def validate_json_data(json_data):
 
             if problem_type == "tsp" and optimal < 0:
                 raise ValueError("'known_optimal' no puede ser negativo.")
+
+        # validate elite_size if its present
+        if "elite_size" in problem:
+            elite = problem["elite_size"]
+            if type(elite) is not int or elite < 0:
+                raise ValueError("'elite_size' has to be an integer >= 0.")
 
 def is_positive_integer(n):
     '''
@@ -244,7 +250,7 @@ def get_configurations_tuple(run):
     """
         Returns the configuration tuple of parameters of a run
     """
-    return (run["population_size"], run["num_generations"], run["mutation_rate"])
+    return (run["population_size"], run["num_generations"], run["mutation_rate"], run.get("elite_size"))
 
 def plot_problem(ax, runs, problem_type):
     """
@@ -261,20 +267,25 @@ def plot_problem(ax, runs, problem_type):
         groups[key].append(run)
 
     for key, configurations in groups.items():
-        population_size, num_generations, mutation_rate = key
-        label = f"pop={population_size}, gen={num_generations}, mut={mutation_rate}"
+        population_size, num_generations, mutation_rate, elite_size = key
+        if elite_size is None:
+            elite_label = "default (5% pop)"
+        else:
+            elite_label = elite_size
+        label = f"pop={population_size}, gen={num_generations}, mut={mutation_rate}, elite = {elite_label}"
 
         # lines with the runs ordered by N
         configurations.sort(key=get_problem_size)
         x = [get_problem_size(run) for run in configurations]
         y = [run["running_time"] for run in configurations]
-        line = ax.plot(x, y, marker="o", label=label)[0]
+        ax.plot(x, y, marker="o", label=label)[0]
 
     # plot format
 
     # integer ticks every 2 sizes (wider step if the range is large, max 10 ticks)
     sizes = [get_problem_size(run) for run in plottable_runs]
-    ax.set_xticks(range(min(sizes), max(sizes) + 1))
+    step = max(1, math.ceil((max(sizes) - min(sizes)) / 10))
+    ax.set_xticks(range(min(sizes), max(sizes) + 1, step))
 
     ax.margins(y=0.03)  # 3% of margin instead of 5% by default
     ax.set_xlabel(f"N: problem size ({'gene length' if problem_type == 'onemax' else 'number of cities'})")

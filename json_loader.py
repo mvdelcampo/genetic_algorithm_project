@@ -90,6 +90,9 @@ def expand_problem_runs(problem_id, problem_type, problem_data):
         if "known_optimal" in problem_data:
             run["known_optimal"] = problem_data["known_optimal"]
 
+        if "elite_size" in problem_data:
+            run["elite_size"] = problem_data["elite_size"]
+
         runs.append(run)
         counter += 1
 
