@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from json import dumps
 from matplotlib.widgets import Button
 from pathlib import Path
+import math
 
 def is_inrange(n):
     if n not in ["1", "2", "3", "4", "5", "6"]:
@@ -208,6 +209,17 @@ def get_problem_size(run):
         return len(run["cities"])
     return None
 
+def is_optimal_value(value, problem_type, known_optimal):
+    """
+        Receives value: distance for TSP, number of ones for OneMax, problem_type and known_optimal.
+        Returns a boolean, True if value = known_optimal (with tolerance of 2 decimals), or False if they are different.
+    """
+    if known_optimal is None:
+        return False
+    if problem_type == "tsp":
+        return value <= known_optimal or math.isclose(value, known_optimal, abs_tol=0.01)
+    return value >= known_optimal
+
 def get_plottable_runs(runs, problem_type):
     """
         Returns runs of the same type, finished, with a known_optimal and that have acheived it.
@@ -217,7 +229,7 @@ def get_plottable_runs(runs, problem_type):
         if run["type"] == problem_type
         and run["status"] == "Finished"
         and run.get("known_optimal") is not None
-        and run.get("known_optimal") == run.get("best_fitness")
+        and is_optimal_value(run.get("best_fitness"), run.get('type'), run.get("known_optimal"))
     ]
 
 def can_plot(runs, problem_type):

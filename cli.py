@@ -144,7 +144,7 @@ def check_status(state):
     print(f'Finished: {finished}')
     print(f'Failed: {failed}')
     print(f"Number of cores: {state['num_cores']}")
-    print(f"Total execution time: {state['total_time']:.2f} seconds")
+    print(f"Total execution time: {state['total_time']:.4f} seconds")
 
     print('\nRUN DETAILS')
     for run in state['runs']:
@@ -165,7 +165,7 @@ def check_status(state):
 
         if run['status'] == 'Finished':
             print(f"Best fitness: {run['best_fitness']}")
-            print(f"Running time: {run['running_time']:.2f} seconds")
+            print(f"Running time: {run['running_time']:.4f} seconds")
 
     return state
 

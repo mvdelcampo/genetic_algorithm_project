@@ -1,5 +1,4 @@
-import random
-import time
+import random, time, math
 
 
 # GENERATE INDIVIDUALS
@@ -120,11 +119,14 @@ def run_genetic_algorithm(population_size,
                           fitness_function,
                           crossover_function,
                           mutation_function,
-                          *args):
+                          *args,
+                          known_optimal = None):
     population = generate_population(population_size, individual_generator, individual_size)
     best_fitness = 0
     best_individual = None
     individuals_evaluated = 0
+    reached_optimum = False
+
     for i in range(num_generations):
         mating_pool = generate_mating_pool(population, fitness_function, *args)
         individuals_evaluated += len(mating_pool)
@@ -141,6 +143,14 @@ def run_genetic_algorithm(population_size,
             if fitness > best_fitness:
                 best_fitness = fitness
                 best_individual = individual
+
+                if has_reached_optimum(best_fitness, fitness_function, known_optimal):
+                    reached_optimum = True
+                    break
+
+        if reached_optimum:
+            break
+
     if fitness_function == fitness_tsp:
         best_fitness = 1 / best_fitness
     return best_individual, best_fitness, individuals_evaluated
@@ -191,7 +201,8 @@ def solve_run(run):
                                                        generate_individual,
                                                        fitness_onemax,
                                                        crossover_bitstring,
-                                                       mutate_bitstring)
+                                                       mutate_bitstring,
+                                                       known_optimal=run.get("known_optimal"))
         else:
             _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
                                                        len(run["cities"]),
@@ -201,9 +212,20 @@ def solve_run(run):
                                                        fitness_tsp,
                                                        crossover_permutation,
                                                        swap_mutation,
-                                                       run["distance_matrix"])
+                                                       run["distance_matrix"],
+                                                       known_optimal=run.get("known_optimal"))
     except Exception as error:
         print(f"Run {run["run_id"]} failed: {error}")
 
     running_time = time.time() - start_time
     return run["run_id"], best_fitness, running_time
+
+# CHECK IF RUN HAS REACHED OPTIMUM
+def has_reached_optimum(fitness, fitness_function, known_optimal):
+    if known_optimal is None:
+        return False
+    if fitness_function == fitness_tsp:
+        distance = 1 / fitness
+        return distance <= known_optimal or math.isclose(distance, known_optimal, abs_tol = 0.01) # to compare values until 2nd decimal
+    # else: onemax
+    return fitness >= known_optimal
