@@ -231,6 +231,8 @@ def export_results(state):
             plot_path = plot_performance(runs, plottable_types, "output")
             print(f"Performance plot saved in {plot_path}.")
 
+    state["unsaved_results"] = True
+    
     return
 
 def exit_program(state):
