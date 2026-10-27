@@ -288,70 +288,18 @@ def plot_problem(ax, runs, problem_type):
     # legend below the subplot
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15))
 
-
 def plot_performance(runs, problem_types, output_dir, show=True):
     """
         Generates one subplot per problem type in the same figure, saves it in a PNG and returns the route.
     """
 
-    files = sorted(set(run["source_file"] for run in runs))
-    filters = ["All files"] + files
+    fig, axes = plt.subplots(1, len(problem_types), figsize=(7 * len(problem_types), 6),
+                             layout="constrained", squeeze=False)
 
-    fig, axes = plt.subplots(
-        1, len(problem_types),
-        figsize=(7 * len(problem_types), 6),
-        squeeze=False
-    )
+    for ax, problem_type in zip(axes[0], problem_types):
+        plot_problem(ax, runs, problem_type)
 
-    plt.subplots_adjust(bottom=0.25)
-
-    buttons = []
-
-    def update_plot(selected_file):
-        if selected_file == "All files":
-            filtered_runs = runs
-        else:
-            filtered_runs = [
-                run for run in runs
-                if run["source_file"] == selected_file
-            ]
-
-        for ax, problem_type in zip(axes[0], problem_types):
-            ax.clear()
-
-            matching = get_plottable_runs(
-                filtered_runs, problem_type
-            )
-
-            if matching:
-                plot_problem(ax, filtered_runs, problem_type)
-            else:
-                ax.set_title(problem_type.upper())
-                ax.text(
-                    0.5, 0.5,
-                    "No data available",
-                    ha="center", va="center",
-                    transform=ax.transAxes
-                )
-
-        fig.canvas.draw_idle()
-
-    for i, name in enumerate(filters):
-        button_ax = fig.add_axes([
-            0.05 + i * (0.9 / len(filters)),
-            0.05,
-            0.85 / len(filters),
-            0.07
-        ])
-
-        button = Button(button_ax, name)
-        button.on_clicked(
-            lambda event, selected=name: update_plot(selected)
-        )
-        buttons.append(button)
-
-    update_plot("All files")
-
+    # save and close
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     plot_path = Path(output_dir) / "performance_plot.png"
     fig.savefig(plot_path)
