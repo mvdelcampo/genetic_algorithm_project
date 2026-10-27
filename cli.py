@@ -1,322 +1,324 @@
+import json
 import multiprocessing
+import time
 from utils import is_inrange, is_num_cores_valid, write_to_file, can_plot, plot_performance
 from functions import solve_run
-import time
+from json_loader import prepare_runs, load_json_file
+from pathlib import Path
 
 
-def load_problem(state):
+def load_problem(state, file_path):
     '''
-    Reads: JSON file / current history.
-    Modifies: runs, history, cores, output configs
-    Error handling: Non-existent file, wrong formatting, invalid values
+    Reads: JSON file path.
+    Modifies: runs, num cores, output configs.
+    Keeps: previous run history and total execution time.
     '''
-    print("Option 1 not implemented yet.")
+    try:
+        json_data = load_json_file(file_path)
+        if json_data is None:
+            return state
+
+        runs = prepare_runs(json_data, file_path)
+
+        if not runs:
+            print("No runs found in the JSON file.")
+            return state
+
+        cores = json_data.get('num_cores', state['num_cores'])
+        if not is_num_cores_valid(str(cores)):
+            print("Invalid number of cores.")
+            return state
+
+        output = json_data.get('output', state['output'])
+        if not isinstance(output, dict):
+            print("Invalid output configuration.")
+            return state
+
+        # Initialize new runs
+        for run in runs:
+            run['known_optimal'] = run.get('known_optimal')
+            run['best_fitness'] = None
+            run['best_fitness_found'] = None
+            run['running_time'] = None
+            run['status'] = 'Pending'
+            run['source_file'] = Path(file_path).name
+
+        # Keep previous history
+        state['runs'].extend(runs)
+
+        # Update current configuration
+        state['file_path'] = file_path
+        state['num_cores'] = int(cores)
+        state['output'] = dict(output)
+
+        # Do not reset total_time
+        return state
+
+    except (ValueError, KeyError, TypeError, OSError) as error:
+        print(f"Error loading problem: {error}")
+        return state
 
 
 def adjust_execution_settings(state):
     '''
     Reads: current num cores.
-    Modifies: num cores
-    Error handling: Only positive value + integer, bigger integer than available cores not valid. 
-                    If so, keep prev num cores.
+    Modifies: num cores.
+    Error handling: Only positive integer up to available cores.
     '''
-    print(f"\nCurrent number of cores: {state["num_cores"]}")
+    print(f"\nCurrent number of cores: {state['num_cores']}")
 
     while True:
-        num_cores = input("Enter the new number of cores to be used for parallel running (or 'b' to fo back to the main menu): ").strip()
+        num_cores = input("Enter the new number of cores to be used for parallel running (or 'b' to go back to the main menu): ").strip()
 
-        if num_cores.lower() == "b":
-            print("No changes made. Returning to the main menu.")
-            return
+        if num_cores.lower() == 'b':
+            print('No changes made. Returning to the main menu.')
+            return state
 
         if is_num_cores_valid(num_cores):
-            state["num_cores"] = int(num_cores)
-            print("The number of cores has been successfully updated.")
-            return
-        else:
-            print("The provided number of cores is not valid, either because it is not a positive integer or the computer does not have so many cores available.")
+            state['num_cores'] = int(num_cores)
+            print('The number of cores has been successfully updated.')
+            return state
 
-        
+        print('The provided number of cores is not valid, either because it is not a positive integer or the computer does not have so many cores available.')
 
 
 def run_all(state):
     '''
-    Reads: Pending runs info, num cores (functions.py and load_problem)
-    Modifies: history, state of each run, running time p-run + total time.
-    Error handling: Nothing loaded, nothing pending, errors inside a run, everything run already
+    Reads: Pending runs, num cores.
+    Modifies: results, status, running time per run and total wall-clock time.
+    Error handling: Nothing loaded, nothing pending, errors inside a run.
     '''
-    if not state["runs"]:
-        print("There is no problem loaded yet. \nPress 1 to load a problem.")
-        return 
-    
+    if not state['runs']:
+        print('There is no problem loaded yet. \nPress 1 to load a problem.')
+        return state
+
     pending = []
-    for run in state["runs"]:
-        if run["status"] == "Pending":
+    for run in state['runs']:
+        if run['status'] == 'Pending':
             pending.append(run)
-    if len(pending) == 0:
-        print("All runs have been executed. Load another problem to execute more runs.")
-        return 
 
-    print(f"Running {len(pending)} runs on {state["num_cores"]} cores")
+    if not pending:
+        print('All runs have been executed. Load another problem to execute more runs.')
+        return state
 
-    start_time = time.time()
-    with multiprocessing.Pool(processes=state["num_cores"]) as pool:
-        results = pool.map(solve_run, pending)
-    state["total_time"] = state["total_time"] + (time.time() - start_time)
+    print(f"Running {len(pending)} runs on {state['num_cores']} cores")
 
+    start_time = time.perf_counter()
+    try:
+        with multiprocessing.Pool(processes=state['num_cores']) as pool:
+            results = pool.map(solve_run, pending)
+    except Exception as error:
+        print(f'Error executing runs: {error}')
+        return state
+
+    state['total_time'] += time.perf_counter() - start_time
+
+    runs_by_id = {run['run_id']: run for run in state['runs']}
     for run_id, best_fitness, running_time in results:
-        for run in state["runs"]:
-            if run_id == run["run_id"]:
-                run["best_fitness"] = best_fitness
-                run["running_time"] = running_time
-                run["status"] = "Finished" if best_fitness is not None else "Failed"
+        run = runs_by_id[run_id]
+        run['best_fitness'] = best_fitness
+        run['best_fitness_found'] = best_fitness  # Compatibility with existing export/plot fields.
+        run['running_time'] = running_time
+        run['status'] = 'Finished' if best_fitness is not None else 'Failed'
 
-    state["unsaved_results"] = True
-
+    state['unsaved_results'] = True
     return state
 
 
 def check_status(state):
     '''
-    Reads: run history // problem, config, best fitness, running time.
-    Optional: Known optimal.
-    Runs: finished / pending + loaded runs (total) + num cores.
-    Error handling: Empty history
+    Reads: runs, best fitness, running time, known optimal, cores, total time.
+    Shows: Loaded, pending, finished and failed runs with their configurations.
+    Error handling: Nothing loaded, no results yet.
     '''
-    print("Option 4 not implemented yet.")
+    if not state['runs']:
+        print('There is no problem loaded yet. \nPress 1 to load a problem.')
+        return state
+
+    total = len(state['runs'])
+    pending = sum(run['status'] == 'Pending' for run in state['runs'])
+    finished = sum(run['status'] == 'Finished' for run in state['runs'])
+    failed = sum(run['status'] == 'Failed' for run in state['runs'])
+
+    print('\nEXECUTION STATUS')
+    print(f'Total runs: {total}')
+    print(f'Pending: {pending}')
+    print(f'Finished: {finished}')
+    print(f'Failed: {failed}')
+    print(f"Number of cores: {state['num_cores']}")
+    print(f"Total execution time: {state['total_time']:.2f} seconds")
+
+    print('\nRUN DETAILS')
+    for run in state['runs']:
+        print(f"\nRun: {run['run_id']}")
+        print(f"Problem: {run['problem_id']}")
+        print(f"Type: {run['type']}")
+        print(f"Population size: {run['population_size']}")
+        print(f"Generations: {run['num_generations']}")
+        print(f"Mutation rate: {run['mutation_rate']}")
+        if run['type'] == 'onemax':
+            print(f"Gene length: {run['gene_length']}")
+        else:
+            print(f"Number of cities: {len(run['cities'])}")
+        print(f"Status: {run['status']}")
+
+        if run.get('known_optimal') is not None:
+            print(f"Known optimal: {run['known_optimal']}")
+
+        if run['status'] == 'Finished':
+            print(f"Best fitness: {run['best_fitness']}")
+            print(f"Running time: {run['running_time']:.2f} seconds")
+
+    return state
 
 
 def export_results(state):
     '''
-    Reads: final history + output configs
-    Builds: output file + performance plot
-    Error handling: Nothing executed yet
+    Reads: finished runs and output configuration.
+    Builds: output file and optional performance plot.
+    Error handling: Nothing executed, invalid or missing output configuration.
     '''
-    # harcoded state to test
-    state = {"runs": [{ "run_id": "onemax_1_run_1",
-                        "problem_id": "onemax_1",
-                        "type": "onemax",
-                        "population_size": 20, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.1, 
-                        "gene_length": 10, 
-                        "known_optimal": 10,
-                        "best_fitness_found": 10,
-                        "running_time": 2.2,
-                        "status": "finished"
-                        },
-                        { "run_id": "onemax_2_run_2",
-                        "problem_id": "onemax_2",
-                        "type": "onemax",
-                        "population_size": 10, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.1, 
-                        "gene_length": 11, 
-                        "known_optimal": 11,
-                        "best_fitness_found": 10,
-                        "running_time": 3.2,
-                        "status": "finished"
-                        },
-                        { "run_id": "onemax_3_run_3",
-                        "problem_id": "onemax_3",
-                        "type": "onemax",
-                        "population_size": 20, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.05, 
-                        "gene_length": 15, 
-                        "known_optimal": 15,
-                        "best_fitness_found": 15,
-                        "running_time": 3.5,
-                        "status": "finished"
-                        },
-                        { "run_id": "onemax_4_run_4",
-                        "problem_id": "onemax_4",
-                        "type": "onemax",
-                        "population_size": 50, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.1, 
-                        "gene_length": 11, 
-                        "known_optimal": 11,
-                        "best_fitness_found": 11,
-                        "running_time": 3.8,
-                        "status": "finished"
-                        },
-                        { "run_id": "onemax_5_run_5",
-                        "problem_id": "onemax_5",
-                        "type": "onemax",
-                        "population_size": 50, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.2, 
-                        "gene_length": 15, 
-                        "known_optimal": 15,
-                        "best_fitness_found": 15,
-                        "running_time": 4.0,
-                        "status": "finished"
-                        },
-                        { "run_id": "onemax_6_run_6",
-                        "problem_id": "onemax_6",
-                        "type": "onemax",
-                        "population_size": 20, 
-                        "num_generations": 30, 
-                        "mutation_rate": 0.05, 
-                        "gene_length": 13, 
-                        "known_optimal": 13,
-                        "best_fitness_found": 13,
-                        "running_time": 3.8,
-                        "status": "finished"
-                        },
-                        {"run_id": "tsp_1_run_1",
-                        "problem_id": "tsp_1",
-                        "type": "tsp",
-                        "population_size": 50, 
-                        "num_generations": 200, 
-                        "mutation_rate": 0.2, 
-                        "cities": [[17, 72], [97, 8], [32, 15], [63, 97]],
-                        "known_optimal": 303,
-                        "best_fitness_found": 303,
-                        "running_time": 5.6,
-                        "status": "finished"
-                        },
-                        { "run_id": "tsp_2_run_2",
-                        "problem_id": "tsp_2",
-                        "type": "tsp",
-                        "population_size": 30, 
-                        "num_generations": 200, 
-                        "mutation_rate": 0.1, 
-                        "cities": [[17, 72], [97, 8], [32, 15]],
-                        "known_optimal": 296,
-                        "best_fitness_found": 296,
-                        "running_time": 6.1,
-                        "status": "finished"
-                        },
-                        {"run_id": "tsp_3_run_3",
-                        "problem_id": "tsp_3",
-                        "type": "tsp",
-                        "population_size": 50, 
-                        "num_generations": 200, 
-                        "mutation_rate": 0.2, 
-                        "cities": [[17, 72], [97, 8], [32, 15], [63, 97], [10, 10]],
-                        "known_optimal": 303,
-                        "best_fitness_found": 303,
-                        "running_time": 6,
-                        "status": "finished"
-                        },
-            ],
-            # "history": [],
-            "num_cores": 1,
-            "output": {"save_to_file": "history.txt",
-                        "performance_plot": True},
-            "total_time": 0.0, 
-            "unsaved_results": False
-        }
+    finished = [run for run in state['runs'] if run['status'] in ('Finished', 'Failed')]
+    if not finished:
+        print('No results available to export. Run the algorithm first.')
+        return state
 
-    # error handling if any key is not present is done in load_problem
-    
-    # save history to file
-    file_name = state["output"]["save_to_file"]
-    print("The results will be saved in the 'output' folder.\nThe configurated file name is", file_name)
-    write_to_file(file_name, state["runs"])
+    output = state.get('output', {})
+    file_name = output.get('save_to_file')
+    if not file_name:
+        print('No output file is configured.')
+        return state
 
-    # performance plot
-    if state["output"]["performance_plot"] is True:
-        runs = state["runs"]
+    print("The results will be saved in the 'output' folder.\nThe configured file name is", file_name)
+    try:
+        write_to_file(file_name, finished)
+    except (OSError, ValueError, TypeError) as error:
+        print(f'Error exporting results: {error}')
+        return state
+
+    state['unsaved_results'] = False
+
+    if output.get('performance_plot', False):
         plottable_types = []
-        for problem_type in sorted({run["type"] for run in runs}):
-            if can_plot(runs, problem_type):
+        for problem_type in sorted({run['type'] for run in finished}):
+            if can_plot(finished, problem_type):
                 plottable_types.append(problem_type)
             else:
-                print(f"Plot of {problem_type} cannot be generated:\n user should load at least 2 problems with different problem size (gene_length or number of cities) and a known_optimal.")
+                print(f'Plot of {problem_type} cannot be generated: at least 2 different problem sizes with known_optimal are required.')
 
         if plottable_types:
-            plot_path = plot_performance(runs, plottable_types, "output")
-            print(f"Performance plot saved in {plot_path}.")
+            try:
+                plot_path = plot_performance(finished, plottable_types, 'output')
+                print(f'Performance plot saved in {plot_path}.')
+            except (OSError, ValueError, TypeError) as error:
+                print(f'Error generating performance plot: {error}')
 
-    state["unsaved_results"] = True
-    
-    return
+    return state
+
 
 def exit_program(state):
     '''
-    Stops the loop returning boolean.
-    Error handling: Warn about non-exported results before exit
+    Stops the menu loop after warning about non-exported results.
     '''
-    if state["unsaved_results"] == True:
-        print("Warning. You have not exported the results yet. \nAre you sure you want to exit the program?\n")
-        decision = input("Type 'y' if you want to exit, 'n' if you want to stay: ")
-        if decision.lower() == "y":
-            quit = True
-        else:
-            quit = False
-            return quit
+    if state['unsaved_results']:
+        print('Warning. You have not exported the results yet. \nAre you sure you want to exit the program?\n')
+        decision = input("Type 'y' if you want to exit, 'n' if you want to stay: ").strip().lower()
+        if decision != 'y':
+            return False
 
-    quit = True
-    return quit
-    
+    return True
+
 
 def current_state():
     '''
-    Returns initial state: runs, history, cores, time...
+    Returns initial state: runs, cores, output configuration, execution time.
     '''
     state = {
-        "runs": [],
-        "num_cores": 1,
-        "output": {"save_to_file": "test3.json"},
-        "total_time": 0.0, 
-        "unsaved_results": False
+        'runs': [],
+        'num_cores': 1,
+        'output': {'save_to_file': 'test3.json', 'performance_plot': False},
+        'total_time': 0.0,
+        'unsaved_results': False
     }
     return state
 
 
+def print_boxed_title(title, width=60):
+    print("+" + "-" * (width - 2) + "+")
+    print("|" + title.center(width - 2) + "|")
+    print("+" + "-" * (width - 2) + "+")
+
+
 def print_options():
-    '''
-    Prints 6 options available.
-    '''
-    print("\nGENETIC ALGORITHM SOLVER \nPlease, choose one of the following options:\n")
-    names = ["Load problem", 
-             "Adjust execution settings", 
-             "Run algorithm", 
-             "Check status", 
-             "Export results", 
-             "Exit Program"]
-    for i in range(1, len(names)+1):
-        print(f"{i}. {names[i-1]}")
+    options = [
+        "1. Load problem",
+        "2. Adjust execution settings",
+        "3. Run algorithm",
+        "4. Check status",
+        "5. Export results",
+        "6. Exit program"
+    ]
+
+    print()
+    print_boxed_title("GENETIC ALGORITHM SOLVER")
+    print("Please choose one of the following options:\n")
+
+    for option in options:
+        print(f"  {option}")
+
+    print("\n" + "-" * 60)
 
 
 def choose_option():
     '''
-    Reads: option from user
-    Returns: valid option
-    Error handling: strings, out of range integers
+    Reads: option from user.
+    Returns: valid option.
+    Error handling: strings, out of range integers.
     '''
-    option = input("\nWhich option would you like to execute?: ").strip()
+    option = input('\nWhich option would you like to execute?: ').strip()
     while not is_inrange(option):
-        option = input("\nWhich option would you like to execute?: ").strip()
-    print(f"\nExecuting option {option}.")
+        option = input('\nWhich option would you like to execute?: ').strip()
+    print(f'\nExecuting option {option}.')
     return option
 
 
 def cli_menu():
     '''
-    Calls empty state
-    Loop to show 6 options with dictionary that ends with boolean from exit_program.
-    Error handling.
+    Creates state and handles the six menu options.
     '''
     state = current_state()
     options_dict = {
-            "1": load_problem,
-            "2": adjust_execution_settings,
-            "3": run_all,
-            "4": check_status,
-            "5": export_results,
-            "6": exit_program
-        }
-    quit = False
+        '2': adjust_execution_settings,
+        '3': run_all,
+        '4': check_status,
+        '5': export_results,
+        '6': exit_program
+    }
 
-    while quit == False:
+    quit = False
+    while not quit:
         print_options()
         option = choose_option()
-        quit = options_dict[f"{option}"](state) is True
-        
-        
-if __name__ == "__main__":
+
+        if option == '1':
+            file_path = input('Enter JSON file path: ').strip()
+
+            previous_count = len(state['runs'])
+            state = load_problem(state, file_path)
+
+            new_count = len(state['runs']) - previous_count
+
+            if new_count > 0:
+                print(f"File loaded successfully: {file_path}")
+                print(f"New runs loaded: {new_count}")
+                print(f"Total session runs: {len(state['runs'])}")
+            else:
+                print("No valid runs loaded. Previous session preserved.")
+        elif option == '6':
+            quit = options_dict[option](state)
+        else:
+            options_dict[option](state)
+
+
+if __name__ == '__main__':
     cli_menu()
