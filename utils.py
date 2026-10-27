@@ -255,7 +255,7 @@ def plot_problem(ax, runs, problem_type):
         reached = []
         failed = []
         for run in configurations:
-            if run.get("known_optimal") == run.get("best_fitness_found"):
+            if run.get("known_optimal") == run.get("best_fitness"):
                 reached.append(run)
             else:
                 failed.append(run)

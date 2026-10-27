@@ -29,7 +29,7 @@ def load_problem(state, file_path):
             print("Invalid number of cores.")
             return state
 
-        output = json_data.get('output', state['output'])
+        output = json_data.get('output', state['output']) # TODO: si no hay output no toma el dict vacio y lo va a dar como valido?
         if not isinstance(output, dict):
             print("Invalid output configuration.")
             return state
@@ -38,7 +38,6 @@ def load_problem(state, file_path):
         for run in runs:
             run['known_optimal'] = run.get('known_optimal')
             run['best_fitness'] = None
-            run['best_fitness_found'] = None
             run['running_time'] = None
             run['status'] = 'Pending'
             run['source_file'] = Path(file_path).name
@@ -85,7 +84,7 @@ def adjust_execution_settings(state):
 def run_all(state):
     '''
     Reads: Pending runs, num cores.
-    Modifies: results, status, running time per run and total wall-clock time.
+    Modifies: results, status, running time per run and total time.
     Error handling: Nothing loaded, nothing pending, errors inside a run.
     '''
     if not state['runs']:
@@ -117,7 +116,6 @@ def run_all(state):
     for run_id, best_fitness, running_time in results:
         run = runs_by_id[run_id]
         run['best_fitness'] = best_fitness
-        run['best_fitness_found'] = best_fitness  # Compatibility with existing export/plot fields.
         run['running_time'] = running_time
         run['status'] = 'Finished' if best_fitness is not None else 'Failed'
 
