@@ -234,7 +234,7 @@ def current_state():
     state = {
         'runs': [],
         'num_cores': 1,
-        'output': {'save_to_file': 'test3.json', 'performance_plot': False},
+        'output': {},
         'total_time': 0.0,
         'unsaved_results': False
     }
