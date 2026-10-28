@@ -1,0 +1,28 @@
+{
+  "onemax_problems": [
+    {
+      "population_size": 20,
+      "num_generations": 30,
+      "mutation_rate": 0.1,
+      "gene_length": 10,
+      "known_optimal": 10
+    },
+    {
+      "population_size": [20, 50],
+      "num_generations": 30,
+      "mutation_rate": [0.05, 0.1, 0.2],
+      "gene_length": 15
+    }
+  ],
+  "tsp_problems": {
+    "population_size": 50,
+    "num_generations": 200,
+    "mutation_rate": 0.2,
+    "cities": [[17, 72], [97, 8], [32, 15], [63, 97]]
+  },
+  "output": {
+    "save_to_file": "results.json",
+    "performance_plot": true
+  },
+  "num_cores": 4
+}

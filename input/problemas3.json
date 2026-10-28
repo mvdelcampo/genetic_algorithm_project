@@ -1,0 +1,157 @@
+{
+  "onemax_problems": [
+    {
+      "population_size": [30, 60],
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 10,
+      "known_optimal": 10
+    },
+    {
+      "population_size": [30, 60],
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 20,
+      "known_optimal": 20
+    },
+    {
+      "population_size": [30, 60],
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 30,
+      "known_optimal": 30
+    },
+    {
+      "population_size": [30, 60],
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 40,
+      "known_optimal": 40
+    },
+    {
+      "population_size": [30, 60],
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 50,
+      "known_optimal": 50
+    },
+    {
+      "population_size": 50,
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 15,
+      "known_optimal": 15,
+      "elite_size": 3
+    },
+    {
+      "population_size": 50,
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 25,
+      "known_optimal": 25,
+      "elite_size": 3
+    },
+    {
+      "population_size": 50,
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 35,
+      "known_optimal": 35,
+      "elite_size": 3
+    },
+    {
+      "population_size": 50,
+      "num_generations": 200,
+      "mutation_rate": 0.02,
+      "gene_length": 45,
+      "known_optimal": 45,
+      "elite_size": 3
+    },
+    {
+      "population_size": 60,
+      "num_generations": 150,
+      "mutation_rate": 0.01,
+      "gene_length": 80,
+      "elite_size": 4
+    }
+  ],
+  "tsp_problems": [
+    {
+      "population_size": [50, 100],
+      "num_generations": 300,
+      "mutation_rate": 0.2,
+      "cities": [[10, 5], [0, 0], [10, 0], [0, 5], [5, 0], [5, 5]],
+      "known_optimal": 30
+    },
+    {
+      "population_size": [50, 100],
+      "num_generations": 300,
+      "mutation_rate": 0.2,
+      "cities": [[0, 5], [10, 0], [5, 0], [0, 0], [10, 10], [10, 5], [5, 10], [0, 10]],
+      "known_optimal": 40
+    },
+    {
+      "population_size": [50, 100],
+      "num_generations": 300,
+      "mutation_rate": 0.2,
+      "cities": [[10, 0], [15, 5], [0, 0], [10, 10], [0, 10], [5, 10], [0, 5], [15, 0], [5, 0], [15, 10]],
+      "known_optimal": 50
+    },
+    {
+      "population_size": [50, 100],
+      "num_generations": 300,
+      "mutation_rate": 0.2,
+      "cities": [[20, 10], [0, 5], [10, 10], [10, 0], [15, 0], [15, 10], [20, 0], [0, 0], [0, 10], [20, 5], [5, 10], [5, 0]],
+      "known_optimal": 60
+    },
+    {
+      "population_size": [50, 100],
+      "num_generations": 300,
+      "mutation_rate": 0.2,
+      "cities": [[20, 10], [10, 0], [0, 10], [0, 0], [10, 15], [20, 5], [5, 15], [15, 15], [20, 15], [0, 15], [20, 0], [0, 5], [5, 0], [15, 0]],
+      "known_optimal": 70
+    },
+    {
+      "population_size": 80,
+      "num_generations": 500,
+      "mutation_rate": 0.2,
+      "cities": [[15, 5], [15, 0], [10, 5], [5, 0], [0, 5], [10, 0], [5, 5], [0, 0]],
+      "known_optimal": 40,
+      "elite_size": 6
+    },
+    {
+      "population_size": 80,
+      "num_generations": 500,
+      "mutation_rate": 0.2,
+      "cities": [[5, 15], [0, 0], [10, 0], [15, 15], [10, 15], [0, 5], [15, 5], [0, 10], [15, 0], [5, 0], [15, 10], [0, 15]],
+      "known_optimal": 60,
+      "elite_size": 6
+    },
+    {
+      "population_size": 80,
+      "num_generations": 500,
+      "mutation_rate": 0.2,
+      "cities": [[25, 10], [10, 0], [25, 0], [5, 10], [0, 0], [15, 10], [25, 5], [20, 10], [0, 10], [20, 0], [15, 0], [5, 0], [10, 10], [0, 5]],
+      "known_optimal": 70,
+      "elite_size": 6
+    },
+    {
+      "population_size": 60,
+      "num_generations": 250,
+      "mutation_rate": 0.2,
+      "cities": [[61, 81], [61, 11], [44, 8], [52, 19], [2, 37], [54, 98], [53, 15], [5, 77], [78, 97], [5, 48], [91, 75], [42, 70], [35, 64], [30, 4], [39, 0]],
+      "elite_size": 4
+    },
+    {
+      "population_size": 40,
+      "num_generations": 150,
+      "mutation_rate": 0.25,
+      "cities": [[-42.3, 9.98], [-46.86, -30.26], [-9.21, 11.05], [-34.38, -45.76], [36.78, -18.62], [45.87, 39.67], [-12.22, -3.96], [2.01, 14.39], [9.57, 5.93]]
+    }
+  ],
+  "output": {
+    "save_to_file": "results_problemas3.json",
+    "performance_plot": true
+  },
+  "num_cores": 4
+}
