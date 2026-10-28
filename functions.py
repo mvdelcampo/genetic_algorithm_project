@@ -1,5 +1,4 @@
-import random
-import time
+import random, time, math
 
 
 # GENERATE INDIVIDUALS
@@ -43,24 +42,52 @@ def fitness_onemax(individual):
 
 
 # MATING POOL FUNCTION
-def generate_mating_pool(population, fitness_function, *args):
-    indexes = [x for x in range(len(population))] 
-    comparisons = []
+def generate_mating_pool(population, fitnesses):
+    n = len(population)
     mating_pool = []
 
-    for i in range(2):
+    for _ in range(2):
+        indexes = list(range(n))
         random.shuffle(indexes)
-        for i in range(0, len(indexes) - 1, 2):
-            tupla = tuple(indexes[i:i+2])
-            comparisons.append(tupla)
 
-    for tupla in comparisons:
-        if (fitness_function(population[tupla[0]], *args) > fitness_function(population[tupla[1]], *args)):
-            mating_pool.append(population[tupla[0]])
-        else:
-            mating_pool.append(population[tupla[1]])
+        for i in range(0, n - 1, 2):
+            a, b = indexes[i], indexes[i + 1]
+            if fitnesses[a] > fitnesses[b]:
+                mating_pool.append(population[a])
+            else:
+                mating_pool.append(population[b])
 
     return mating_pool
+
+# NOVEL FEATURE: ELITISM
+def select_elites(population, fitnesses, elite_size):
+    """
+        Receives the population with their fitnesses calculated
+        and returns the best elite_size individuals in a tuple (individual, fitness)
+    """
+
+    indexes = list(range(len(population)))
+    indexes.sort(key = lambda i: fitnesses[i], reverse=True)
+    # sort indexes by their fitness, best first
+
+    elites = []
+    for i in indexes[:elite_size]:
+        elites.append((list(population[i]), fitnesses[i]))
+        # copy of individual
+    return elites
+
+def insert_elites(population, fitnesses, elites):
+    """
+        Inserts the elite individuals into the population, substituting the worst individuals.
+        Works in-place (in the variables passed in the arguments)
+    """
+
+    indexes = list(range(len(population)))
+    indexes.sort(key=lambda i: fitnesses[i]) # worst first
+
+    for position, (elite, elite_fitness) in zip(indexes, elites):
+        population[position] = elite
+        fitnesses[position] = elite_fitness
 
 
 # CROSSOVER FUNCTIONS
@@ -120,27 +147,63 @@ def run_genetic_algorithm(population_size,
                           fitness_function,
                           crossover_function,
                           mutation_function,
-                          *args):
+                          *args,
+                          known_optimal = None,
+                          elite_size = None):
+
+    if elite_size is None:
+        # by default 5% of the population, and a minimum of 1
+        elite_size = max(1, int(0.05 * population_size))
+    # safe limit: if elite_size is >= population_size, insert_elites would overwrite all children with copies of the past generations
+    elite_size = min(elite_size, population_size - 1)
+
+    # initial population and fitness
     population = generate_population(population_size, individual_generator, individual_size)
-    best_fitness = 0
-    best_individual = None
-    individuals_evaluated = 0
+    fitnesses = [fitness_function(ind, *args) for ind in population]
+    individuals_evaluated = len(population)
+    
+    best_fitness = max(fitnesses)
+    best_individual = list(population[fitnesses.index(best_fitness)])
+    reached_optimum = has_reached_optimum(best_fitness, fitness_function, known_optimal)
+
     for i in range(num_generations):
-        mating_pool = generate_mating_pool(population, fitness_function, *args)
-        individuals_evaluated += len(mating_pool)
+        if reached_optimum:
+            break
+
+        # save the best of this generation
+        elites = select_elites(population, fitnesses, elite_size)
+
+        # selection and crossover
+        mating_pool = generate_mating_pool(population, fitnesses)
         new_population = []
-        population = []
-        for j in range(0, len(mating_pool), 2):
+
+        for j in range(0, len(mating_pool) -1, 2):
             child1, child2 = crossover_function(mating_pool[j], mating_pool[j+1])
             new_population.append(child1)
             new_population.append(child2)
+
+        # mutation and evaluation of children
+        new_fitnesses =[]
         for j in range(len(new_population)):
-            individual = mutation_function(new_population[j], mutation_rate)
-            population.append(individual)
-            fitness = fitness_function(individual, *args)
-            if fitness > best_fitness:
-                best_fitness = fitness
-                best_individual = individual
+            new_population[j] = mutation_function(new_population[j], mutation_rate)
+            new_fitnesses.append(fitness_function(new_population[j], *args))
+        
+        individuals_evaluated += len(new_population)
+
+        # elites substitute the worst children
+        insert_elites(new_population, new_fitnesses, elites)
+
+        population = new_population
+        fitnesses = new_fitnesses
+
+        # update the best fitness found
+        generation_best = max(fitnesses)
+        
+        if generation_best > best_fitness:
+            best_fitness = generation_best
+            best_individual = list(population[fitnesses.index(generation_best)])
+            reached_optimum = has_reached_optimum(best_fitness, fitness_function, known_optimal)
+
     if fitness_function == fitness_tsp:
         best_fitness = 1 / best_fitness
     return best_individual, best_fitness, individuals_evaluated
@@ -191,7 +254,9 @@ def solve_run(run):
                                                        generate_individual,
                                                        fitness_onemax,
                                                        crossover_bitstring,
-                                                       mutate_bitstring)
+                                                       mutate_bitstring,
+                                                       known_optimal=run.get("known_optimal"),
+                                                       elite_size=run.get("elite_size"))
         else:
             _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
                                                        len(run["cities"]),
@@ -201,9 +266,21 @@ def solve_run(run):
                                                        fitness_tsp,
                                                        crossover_permutation,
                                                        swap_mutation,
-                                                       run["distance_matrix"])
+                                                       run["distance_matrix"],
+                                                       known_optimal=run.get("known_optimal"),
+                                                       elite_size=run.get("elite_size"))
     except Exception as error:
         print(f"Run {run["run_id"]} failed: {error}")
 
     running_time = time.time() - start_time
     return run["run_id"], best_fitness, running_time
+
+# CHECK IF RUN HAS REACHED OPTIMUM
+def has_reached_optimum(fitness, fitness_function, known_optimal):
+    if known_optimal is None:
+        return False
+    if fitness_function == fitness_tsp:
+        distance = 1 / fitness
+        return distance <= known_optimal or math.isclose(distance, known_optimal, abs_tol = 0.01) # to compare values until 2nd decimal
+    # else: onemax
+    return fitness >= known_optimal

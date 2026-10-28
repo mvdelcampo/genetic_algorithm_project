@@ -26,10 +26,10 @@ def load_problem(state, file_path):
 
         cores = json_data.get('num_cores', state['num_cores'])
         if not is_num_cores_valid(str(cores)):
-            print("Invalid number of cores.")
+            print("Invalid number of cores.\n It is not a positive integer or the computer does not have that many cores available.")
             return state
 
-        output = json_data.get('output', state['output'])
+        output = json_data.get('output', state['output']) # TODO: si no hay output no toma el dict vacio y lo va a dar como valido?
         if not isinstance(output, dict):
             print("Invalid output configuration.")
             return state
@@ -38,7 +38,6 @@ def load_problem(state, file_path):
         for run in runs:
             run['known_optimal'] = run.get('known_optimal')
             run['best_fitness'] = None
-            run['best_fitness_found'] = None
             run['running_time'] = None
             run['status'] = 'Pending'
             run['source_file'] = Path(file_path).name
@@ -79,13 +78,13 @@ def adjust_execution_settings(state):
             print('The number of cores has been successfully updated.')
             return state
 
-        print('The provided number of cores is not valid, either because it is not a positive integer or the computer does not have so many cores available.')
+        print('The provided number of cores is not valid, either because it is not a positive integer or the computer does not have that many cores available.')
 
 
 def run_all(state):
     '''
     Reads: Pending runs, num cores.
-    Modifies: results, status, running time per run and total wall-clock time.
+    Modifies: results, status, running time per run and total time.
     Error handling: Nothing loaded, nothing pending, errors inside a run.
     '''
     if not state['runs']:
@@ -117,7 +116,6 @@ def run_all(state):
     for run_id, best_fitness, running_time in results:
         run = runs_by_id[run_id]
         run['best_fitness'] = best_fitness
-        run['best_fitness_found'] = best_fitness  # Compatibility with existing export/plot fields.
         run['running_time'] = running_time
         run['status'] = 'Finished' if best_fitness is not None else 'Failed'
 
@@ -146,7 +144,7 @@ def check_status(state):
     print(f'Finished: {finished}')
     print(f'Failed: {failed}')
     print(f"Number of cores: {state['num_cores']}")
-    print(f"Total execution time: {state['total_time']:.2f} seconds")
+    print(f"Total execution time: {state['total_time']:.4f} seconds")
 
     print('\nRUN DETAILS')
     for run in state['runs']:
@@ -165,9 +163,12 @@ def check_status(state):
         if run.get('known_optimal') is not None:
             print(f"Known optimal: {run['known_optimal']}")
 
+        if run.get('elite_size') is not None:
+                    print(f"Elite size: {run['elite_size']}")
+
         if run['status'] == 'Finished':
             print(f"Best fitness: {run['best_fitness']}")
-            print(f"Running time: {run['running_time']:.2f} seconds")
+            print(f"Running time: {run['running_time']:.4f} seconds")
 
     return state
 
@@ -236,7 +237,7 @@ def current_state():
     state = {
         'runs': [],
         'num_cores': 1,
-        'output': {'save_to_file': 'test3.json', 'performance_plot': False},
+        'output': {},
         'total_time': 0.0,
         'unsaved_results': False
     }

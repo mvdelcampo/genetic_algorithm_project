@@ -2,8 +2,7 @@ from os import process_cpu_count
 from pathlib import Path
 import matplotlib.pyplot as plt
 from json import dumps
-from matplotlib.widgets import Button
-from pathlib import Path
+import math
 
 def is_inrange(n):
     if n not in ["1", "2", "3", "4", "5", "6"]:
@@ -16,7 +15,7 @@ def validate_json_data(json_data):
     problems = []
     required_onemax = {"population_size", "num_generations", "mutation_rate", "gene_length"}
     required_tsp = {"population_size", "num_generations", "mutation_rate", "cities"}
-    optional_problem = {"known_optimal"}
+    optional_problem = {"known_optimal", "elite_size"}
     optional_general = {"num_cores", "output"}
     allowed_groups = {"onemax_problems", "tsp_problems"}
 
@@ -102,6 +101,8 @@ def validate_json_data(json_data):
             for item in values:
                 if key == "mutation_rate":
                     valid = type(item) in (int, float) and 0 < item <= 1
+                elif key == "population_size":
+                    valid = type(item) is int and item >= 2
                 else:
                     valid = type(item) is int and item > 0
 
@@ -143,6 +144,12 @@ def validate_json_data(json_data):
 
             if problem_type == "tsp" and optimal < 0:
                 raise ValueError("'known_optimal' no puede ser negativo.")
+
+        # validate elite_size if its present
+        if "elite_size" in problem:
+            elite = problem["elite_size"]
+            if type(elite) is not int or elite < 0:
+                raise ValueError("'elite_size' has to be an integer >= 0.")
 
 def is_positive_integer(n):
     '''
@@ -208,15 +215,27 @@ def get_problem_size(run):
         return len(run["cities"])
     return None
 
+def is_optimal_value(value, problem_type, known_optimal):
+    """
+        Receives value: distance for TSP, number of ones for OneMax, problem_type and known_optimal.
+        Returns a boolean, True if value = known_optimal (with tolerance of 2 decimals), or False if they are different.
+    """
+    if known_optimal is None:
+        return False
+    if problem_type == "tsp":
+        return value <= known_optimal or math.isclose(value, known_optimal, abs_tol=0.01)
+    return value >= known_optimal
+
 def get_plottable_runs(runs, problem_type):
     """
-        Returns runs of the same type, finished and with known_optimal.
+        Returns runs of the same type, finished, with a known_optimal and that have acheived it.
     """
     return [
         run for run in runs
         if run["type"] == problem_type
         and run["status"] == "Finished"
         and run.get("known_optimal") is not None
+        and is_optimal_value(run.get("best_fitness"), run.get('type'), run.get("known_optimal"))
     ]
 
 def can_plot(runs, problem_type):
@@ -231,7 +250,7 @@ def get_configurations_tuple(run):
     """
         Returns the configuration tuple of parameters of a run
     """
-    return (run["population_size"], run["num_generations"], run["mutation_rate"])
+    return (run["population_size"], run["num_generations"], run["mutation_rate"], run.get("elite_size"))
 
 def plot_problem(ax, runs, problem_type):
     """
@@ -248,110 +267,48 @@ def plot_problem(ax, runs, problem_type):
         groups[key].append(run)
 
     for key, configurations in groups.items():
-        population_size, num_generations, mutation_rate = key
-        label = f"pop={population_size}, gen={num_generations}, mut={mutation_rate}"
+        population_size, num_generations, mutation_rate, elite_size = key
+        if elite_size is None:
+            elite_label = "default (5% pop)"
+        else:
+            elite_label = elite_size
+        label = f"pop={population_size}, gen={num_generations}, mut={mutation_rate}, elite = {elite_label}"
 
-        # separate runs that reached the optimum from the ones that didnt
-        reached = []
-        failed = []
-        for run in configurations:
-            if run.get("known_optimal") == run.get("best_fitness_found"):
-                reached.append(run)
-            else:
-                failed.append(run)
-
-        # lines with the runs that reached the optimum, ordered by N
-        reached.sort(key=get_problem_size)
-        x = [get_problem_size(run) for run in reached]
-        y = [run["running_time"] for run in reached]
-        line = ax.plot(x, y, marker="o", label=label)[0]
-
-        # adds an 'X' of same color to the ones that didnt reach the optimum
-        x_failed = [get_problem_size(run) for run in failed]
-        y_failed = [run["running_time"] for run in failed]
-        ax.scatter(x_failed, y_failed, marker="x", s=80, color=line.get_color())
+        # lines with the runs ordered by N
+        configurations.sort(key=get_problem_size)
+        x = [get_problem_size(run) for run in configurations]
+        y = [run["running_time"] for run in configurations]
+        ax.plot(x, y, marker="o", label=label)[0]
 
     # plot format
 
-    # keep only actual sizes in x axis
+    # integer ticks every 2 sizes (wider step if the range is large, max 10 ticks)
     sizes = [get_problem_size(run) for run in plottable_runs]
-    ax.set_xticks(range(min(sizes), max(sizes) + 1))
+    step = max(1, math.ceil((max(sizes) - min(sizes)) / 10))
+    ax.set_xticks(range(min(sizes), max(sizes) + 1, step))
 
-    ax.set_xlabel(f"N: problem size ({'gene_length' if problem_type == 'onemax' else 'number of cities'})")
-    ax.set_ylabel("Time to reach optimum (s)")
+    ax.margins(y=0.03)  # 3% of margin instead of 5% by default
+    ax.set_xlabel(f"N: problem size ({'gene length' if problem_type == 'onemax' else 'number of cities'})")
+    ax.set_ylabel("Time (s)")
     ax.set_title(f"{problem_type.upper()}: time to reach optimum vs N")
     ax.grid(alpha=0.3)
 
-    # add legend entry explaining the 'X' marker
-    ax.scatter([], [], marker="x", s=80, color="black", label="didn't reach optimum")
-
-    # legend below the subplot
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15))
-
+    # legend to the right of the subplot, vertically centered
+    ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5))
 
 def plot_performance(runs, problem_types, output_dir, show=True):
     """
-        Generates one subplot per problem type in the same figure, saves it in a PNG and returns the route.
+        Generates one subplot per problem type in the same figure (stacked vertically),
+        saves it in a PNG and returns the route.
     """
 
-    files = sorted(set(run["source_file"] for run in runs))
-    filters = ["All files"] + files
+    fig, axes = plt.subplots(len(problem_types), 1, figsize=(10, 4.5 * len(problem_types)),
+                             layout="constrained", squeeze=False)
 
-    fig, axes = plt.subplots(
-        1, len(problem_types),
-        figsize=(7 * len(problem_types), 6),
-        squeeze=False
-    )
+    for ax, problem_type in zip(axes[:, 0], problem_types):
+        plot_problem(ax, runs, problem_type)
 
-    plt.subplots_adjust(bottom=0.25)
-
-    buttons = []
-
-    def update_plot(selected_file):
-        if selected_file == "All files":
-            filtered_runs = runs
-        else:
-            filtered_runs = [
-                run for run in runs
-                if run["source_file"] == selected_file
-            ]
-
-        for ax, problem_type in zip(axes[0], problem_types):
-            ax.clear()
-
-            matching = get_plottable_runs(
-                filtered_runs, problem_type
-            )
-
-            if matching:
-                plot_problem(ax, filtered_runs, problem_type)
-            else:
-                ax.set_title(problem_type.upper())
-                ax.text(
-                    0.5, 0.5,
-                    "No data available",
-                    ha="center", va="center",
-                    transform=ax.transAxes
-                )
-
-        fig.canvas.draw_idle()
-
-    for i, name in enumerate(filters):
-        button_ax = fig.add_axes([
-            0.05 + i * (0.9 / len(filters)),
-            0.05,
-            0.85 / len(filters),
-            0.07
-        ])
-
-        button = Button(button_ax, name)
-        button.on_clicked(
-            lambda event, selected=name: update_plot(selected)
-        )
-        buttons.append(button)
-
-    update_plot("All files")
-
+    # save and close
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     plot_path = Path(output_dir) / "performance_plot.png"
     fig.savefig(plot_path)
