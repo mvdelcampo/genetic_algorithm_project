@@ -9,9 +9,7 @@ from pathlib import Path
 
 def load_problem(state, file_path):
     '''
-    Reads: JSON file path.
-    Modifies: runs, num cores, output configs.
-    Keeps: previous run history and total execution time.
+    Loads a JSON problem and warns if there is any incosistency.
     '''
     try:
         json_data = load_json_file(file_path)
@@ -60,9 +58,7 @@ def load_problem(state, file_path):
 
 def adjust_execution_settings(state):
     '''
-    Reads: current num cores.
-    Modifies: num cores.
-    Error handling: Only positive integer up to available cores.
+    Adjust the number of cores and warns if you have entered a not valid number
     '''
     print(f"\nCurrent number of cores: {state['num_cores']}")
 
@@ -83,9 +79,7 @@ def adjust_execution_settings(state):
 
 def run_all(state):
     '''
-    Reads: Pending runs, num cores.
-    Modifies: results, status, running time per run and total time.
-    Error handling: Nothing loaded, nothing pending, errors inside a run.
+    Runs the algorithm and warns if no problem has been loaded or all runs have been executed.
     '''
     if not state['runs']:
         print('There is no problem loaded yet. \nPress 1 to load a problem.')
@@ -125,9 +119,7 @@ def run_all(state):
 
 def check_status(state):
     '''
-    Reads: runs, best fitness, running time, known optimal, cores, total time.
-    Shows: Loaded, pending, finished and failed runs with their configurations.
-    Error handling: Nothing loaded, no results yet.
+    Checks the status of the state and warns if no problem has been loaded.
     '''
     if not state['runs']:
         print('There is no problem loaded yet. \nPress 1 to load a problem.')
@@ -146,38 +138,39 @@ def check_status(state):
     print(f"Number of cores: {state['num_cores']}")
     print(f"Total execution time: {state['total_time']:.4f} seconds")
 
-    print('\nRUN DETAILS')
-    for run in state['runs']:
-        print(f"\nRun: {run['run_id']}")
-        print(f"Problem: {run['problem_id']}")
-        print(f"Type: {run['type']}")
-        print(f"Population size: {run['population_size']}")
-        print(f"Generations: {run['num_generations']}")
-        print(f"Mutation rate: {run['mutation_rate']}")
-        if run['type'] == 'onemax':
-            print(f"Gene length: {run['gene_length']}")
-        else:
-            print(f"Number of cities: {len(run['cities'])}")
-        print(f"Status: {run['status']}")
+    print("\nWould you like to see the exact run details of each executed run?\n")
+    details = input("Type 'y' if you want to see them, 'n' if you want to return to the menu: ").strip().lower()
+    if details == "y":
+        print('\nRUN DETAILS')
+        for run in state['runs']:
+            print(f"\nRun: {run['run_id']}")
+            print(f"Problem: {run['problem_id']}")
+            print(f"Type: {run['type']}")
+            print(f"Population size: {run['population_size']}")
+            print(f"Generations: {run['num_generations']}")
+            print(f"Mutation rate: {run['mutation_rate']}")
+            if run['type'] == 'onemax':
+                print(f"Gene length: {run['gene_length']}")
+            else:
+                print(f"Number of cities: {len(run['cities'])}")
+            print(f"Status: {run['status']}")
 
-        if run.get('known_optimal') is not None:
-            print(f"Known optimal: {run['known_optimal']}")
+            if run.get('known_optimal') is not None:
+                print(f"Known optimal: {run['known_optimal']}")
 
-        if run.get('elite_size') is not None:
-                    print(f"Elite size: {run['elite_size']}")
+            if run.get('elite_size') is not None:
+                        print(f"Elite size: {run['elite_size']}")
 
-        if run['status'] == 'Finished':
-            print(f"Best fitness: {run['best_fitness']}")
-            print(f"Running time: {run['running_time']:.4f} seconds")
+            if run['status'] == 'Finished':
+                print(f"Best fitness: {run['best_fitness']}")
+                print(f"Running time: {run['running_time']:.4f} seconds")
 
     return state
 
 
 def export_results(state):
     '''
-    Reads: finished runs and output configuration.
-    Builds: output file and optional performance plot.
-    Error handling: Nothing executed, invalid or missing output configuration.
+    Exports results from runs and warns if the algorithm has not been executed.
     '''
     finished = [run for run in state['runs'] if run['status'] in ('Finished', 'Failed')]
     if not finished:
