@@ -213,7 +213,7 @@ def export_results(state):
 
         if plottable_types:
             try:
-                plot_path = plot_performance(finished, plottable_types, 'output')
+                plot_path = plot_performance(finished, plottable_types, 'output', file_name)
                 print(f'Performance plot saved in {plot_path}.')
             except (OSError, ValueError, TypeError) as error:
                 print(f'Error generating performance plot: {error}')
