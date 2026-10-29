@@ -107,10 +107,11 @@ def run_all(state):
     state['total_time'] += time.perf_counter() - start_time
 
     runs_by_id = {run['run_id']: run for run in state['runs']}
-    for run_id, best_fitness, running_time in results:
+    for run_id, best_fitness, running_time, distance_before_2opt in results:
         run = runs_by_id[run_id]
         run['best_fitness'] = best_fitness
         run['running_time'] = running_time
+        run["distance_before_2opt"] = distance_before_2opt
         run['status'] = 'Finished' if best_fitness is not None else 'Failed'
 
     state['unsaved_results'] = True
@@ -164,6 +165,16 @@ def check_status(state):
             if run['status'] == 'Finished':
                 print(f"Best fitness: {run['best_fitness']}")
                 print(f"Running time: {run['running_time']:.4f} seconds")
+
+            if run["type"] == "tsp" and run.get("distance_before_2opt") is not None:
+                before = run["distance_before_2opt"]
+                after = run["best_fitness"]
+
+                improvement = (before - after) / before * 100
+
+                print(f"Distance before 2-opt: {before:.4f}")
+                print(f"Distance after 2-opt:  {after:.4f}")
+                print(f"Improvement:           {improvement:.2f}%")
 
     return state
 

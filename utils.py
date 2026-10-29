@@ -20,9 +20,9 @@ def validate_json_data(json_data):
     allowed_groups = {"onemax_problems", "tsp_problems"}
 
     if "type" in json_data:
-        # Un solo problema
+        # Single problem
         if json_data["type"] not in ("onemax", "tsp"):
-            raise ValueError("Tipo de problema no válido.")
+            raise ValueError("Invalid problem type.")
 
         problems.append((json_data["type"], json_data))
 
@@ -30,7 +30,7 @@ def validate_json_data(json_data):
         allowed_keys = allowed_groups | optional_general
 
         if not set(json_data).issubset(allowed_keys):
-            raise ValueError("El JSON contiene claves no permitidas.")
+            raise ValueError("JSON contains invalid keys.")
 
         for group_name, problem_type in (
             ("onemax_problems", "onemax"),
@@ -46,33 +46,33 @@ def validate_json_data(json_data):
                 problems.append((problem_type, problem))
 
     if not problems:
-        raise ValueError("El JSON no contiene problemas.")
+        raise ValueError("JSON does not contain any problems.")
 
-    # 3. Validar configuración general
+    # 3. Validate general configuration
     num_cores = json_data.get("num_cores", 1)
     if type(num_cores) is not int or num_cores <= 0:
-        raise ValueError("'num_cores' debe ser un entero positivo.")
+        raise ValueError("'num_cores' must be a positive integer.")
 
     output = json_data.get("output", {})
     if not isinstance(output, dict):
-        raise ValueError("'output' debe ser un diccionario.")
+        raise ValueError("'output' must be a dictionary.")
 
     if not set(output).issubset({"save_to_file", "performance_plot"}):
-        raise ValueError("'output' contiene claves no permitidas.")
+        raise ValueError("'output' contains invalid keys.")
 
     if "save_to_file" in output:
         path = output["save_to_file"]
         if path is not None and (not isinstance(path, str) or not path.strip()):
-            raise ValueError("'save_to_file' debe ser una ruta válida.")
+            raise ValueError("'save_to_file' must be a valid path.")
 
     if "performance_plot" in output:
         if type(output["performance_plot"]) is not bool:
-            raise ValueError("'performance_plot' debe ser booleano.")
+            raise ValueError("'performance_plot' must be a boolean.")
 
-    # 4. Validar todos los problemas
+    # 4. Validate all problems
     for problem_type, problem in problems:
         if not isinstance(problem, dict):
-            raise ValueError("Cada problema debe ser un diccionario.")
+            raise ValueError("Each problem must be a dictionary.")
 
         if problem_type == "onemax":
             required_keys = required_onemax
@@ -84,19 +84,19 @@ def validate_json_data(json_data):
             allowed_keys = allowed_keys.union(optional_general, {"type"})
 
         if not required_keys.issubset(problem):
-            raise ValueError(f"Faltan claves obligatorias en {problem_type}.")
+            raise ValueError(f"Missing required keys in {problem_type}.")
 
         if not set(problem).issubset(allowed_keys):
-            raise ValueError(f"Hay claves no permitidas en {problem_type}.")
+            raise ValueError(f"Invalid keys in {problem_type}.")
 
-        # 5. Validar hiperparámetros
+        # 5. Validate hyperparameters
         for key in ("population_size", "num_generations", "mutation_rate"):
             values = problem[key]
             if not isinstance(values, list):
                 values = [values]
 
             if not values:
-                raise ValueError(f"'{key}' no puede estar vacío.")
+                raise ValueError(f"'{key}' cannot be empty.")
 
             for item in values:
                 if key == "mutation_rate":
@@ -107,49 +107,53 @@ def validate_json_data(json_data):
                     valid = type(item) is int and item > 0
 
                 if not valid:
-                    raise ValueError(f"Valor no válido en '{key}': {item}")
+                    raise ValueError(f"Invalid value for '{key}': {item}")
 
-        # 6. Validar OneMax
+        # 6. Validate OneMax
         if problem_type == "onemax":
             gene_length = problem["gene_length"]
             if type(gene_length) is not int or gene_length <= 0:
-                raise ValueError("'gene_length' debe ser un entero positivo.")
+                raise ValueError("'gene_length' must be a positive integer.")
 
-        # 7. Validar TSP
+        # 7. Validate TSP
         else:
             cities = problem["cities"]
 
-            if not isinstance(cities, list) or len(cities) < 2:
-                raise ValueError("TSP requiere al menos dos ciudades.")
+            if not isinstance(cities, list) or len(cities) < 4:
+                raise ValueError("TSP requires at least 4 cities.")
 
             for city in cities:
                 if not isinstance(city, list) or len(city) != 2:
-                    raise ValueError("Cada ciudad debe contener [x, y].")
+                    raise ValueError("Each city must contain [x, y].")
 
                 for coordinate in city:
                     if type(coordinate) not in (int, float):
-                        raise ValueError("Las coordenadas deben ser numéricas.")
+                        raise ValueError("City coordinates must be numeric.")
 
-        # 8. Validar óptimo conocido
+                    if coordinate == 0:
+                        raise ValueError("City coordinates cannot be zero.")
+
+        # 8. Validate known optimal
         if "known_optimal" in problem:
             optimal = problem["known_optimal"]
 
             if type(optimal) not in (int, float):
-                raise ValueError("'known_optimal' debe ser numérico.")
+                raise ValueError("'known_optimal' must be numeric.")
 
             if problem_type == "onemax" and optimal != problem["gene_length"]:
                 raise ValueError(
-                    "'known_optimal' debe ser igual a 'gene_length'."
+                    "'known_optimal' must be equal to 'gene_length'."
                 )
 
             if problem_type == "tsp" and optimal < 0:
-                raise ValueError("'known_optimal' no puede ser negativo.")
+                raise ValueError("'known_optimal' cannot be negative.")
 
-        # validate elite_size if its present
+        # 9. Validate elite_size if present
         if "elite_size" in problem:
             elite = problem["elite_size"]
             if type(elite) is not int or elite < 0:
-                raise ValueError("'elite_size' has to be an integer >= 0.")
+                raise ValueError("'elite_size' must be an integer >= 0.")
+
 
 def is_positive_integer(n):
     '''
@@ -290,7 +294,7 @@ def plot_problem(ax, runs, problem_type):
     ax.margins(y=0.03)  # 3% of margin instead of 5% by default
     ax.set_xlabel(f"N: problem size ({'gene length' if problem_type == 'onemax' else 'number of cities'})")
     ax.set_ylabel("Time (s)")
-    ax.set_title(f"{problem_type.upper()}: time to reach optimum vs N")
+    ax.set_title(f"{problem_type.upper()}: execution time vs problem size")
     ax.grid(alpha=0.3)
 
     # legend to the right of the subplot, vertically centered
