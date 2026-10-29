@@ -3,6 +3,11 @@ Command-line tool that solves OneMax and Traveling Salesman (TSP) problems with 
 
 Capstone project (Advanced track) for the course *Programming Tools for Data Science and Artificial Intelligence*, 
 
+## Requirements
+```bash
+pip install -r requirements.txt
+```
+
 ##  Repository organization
 The repository follows this structure:
 
