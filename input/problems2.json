@@ -150,7 +150,7 @@
     }
   ],
   "output": {
-    "save_to_file": "results_problemas3.json",
+    "save_to_file": "results_problems2.json",
     "performance_plot": true
   },
   "num_cores": 4

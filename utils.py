@@ -130,8 +130,10 @@ def validate_json_data(json_data):
                     if type(coordinate) not in (int, float):
                         raise ValueError("City coordinates must be numeric.")
 
-                    if coordinate == 0:
-                        raise ValueError("City coordinates cannot be zero.")
+            # all cities in the same position, makes every route length 0
+            if len({tuple(city) for city in cities}) == 1:
+                raise ValueError("All cities cannot have the same coordinates.")
+
 
         # 8. Validate known optimal
         if "known_optimal" in problem:
@@ -300,7 +302,7 @@ def plot_problem(ax, runs, problem_type):
     # legend to the right of the subplot, vertically centered
     ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5))
 
-def plot_performance(runs, problem_types, output_dir, show=True):
+def plot_performance(runs, problem_types, output_dir, file_name, show=True):
     """
         Generates one subplot per problem type in the same figure (stacked vertically),
         saves it in a PNG and returns the route.
@@ -314,7 +316,8 @@ def plot_performance(runs, problem_types, output_dir, show=True):
 
     # save and close
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    plot_path = Path(output_dir) / "performance_plot.png"
+    plot_name = Path(file_name).stem + "_plot.png"
+    plot_path = Path(output_dir) / plot_name
     fig.savefig(plot_path)
 
     if show:
