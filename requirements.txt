@@ -1,0 +1,3 @@
+# Python 3.13+ required for os.process_cpu_count() in utils.py
+matplotlib>=3.10,<4
+numpy>=2.1,<3

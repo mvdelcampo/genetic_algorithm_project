@@ -138,12 +138,37 @@ def swap_mutation(individual, mutation_rate):
     return individual
 
 
+
+def two_opt(route, distances):
+    best = route.copy()
+    n = len(best)
+    if n < 4:
+        return best
+
+    improved = True
+    while improved:
+        improved = False
+        for i in range(1, n - 1):
+            for j in range(i + 1, n):
+                a, b = best[i - 1], best[i]
+                c, d = best[j], best[(j + 1) % n]
+                old = distances[a][b] + distances[c][d]
+                new = distances[a][c] + distances[b][d]
+                if new < old:
+                    best[i:j + 1] = reversed(best[i:j + 1])
+                    improved = True
+                    break
+            if improved:
+                break
+    return best
+
+
 # GENETIC ALGORITHM
-def run_genetic_algorithm(population_size, 
-                          individual_size, 
-                          num_generations, 
-                          mutation_rate, 
-                          individual_generator, 
+def run_genetic_algorithm(population_size,
+                          individual_size,
+                          num_generations,
+                          mutation_rate,
+                          individual_generator,
                           fitness_function,
                           crossover_function,
                           mutation_function,
@@ -159,13 +184,12 @@ def run_genetic_algorithm(population_size,
 
     # initial population and fitness
     population = generate_population(population_size, individual_generator, individual_size)
-    fitnesses = [fitness_function(ind, *args) for ind in population]
-    individuals_evaluated = len(population)
-    
-    best_fitness = max(fitnesses)
-    best_individual = list(population[fitnesses.index(best_fitness)])
-    reached_optimum = has_reached_optimum(best_fitness, fitness_function, known_optimal)
+    best_fitness = 0
+    best_individual = None
+    individuals_evaluated = 0
+    fitnesses = [fitness_function(individual, *args) for individual in population]
 
+    reached_optimum = False
     for i in range(num_generations):
         if reached_optimum:
             break
@@ -204,9 +228,15 @@ def run_genetic_algorithm(population_size,
             best_individual = list(population[fitnesses.index(generation_best)])
             reached_optimum = has_reached_optimum(best_fitness, fitness_function, known_optimal)
 
+    distance_before_2opt = None
+
     if fitness_function == fitness_tsp:
-        best_fitness = 1 / best_fitness
-    return best_individual, best_fitness, individuals_evaluated
+        distance_before_2opt = tsp_distance(best_individual, args[0])
+
+        best_individual = two_opt(best_individual, args[0])
+        best_fitness = tsp_distance(best_individual, args[0])
+
+    return best_individual, best_fitness, individuals_evaluated, distance_before_2opt
 
 
 # DISTANCE MATRIX
@@ -244,10 +274,12 @@ def random_search(size, distances, time_limit = 3.0):
 def solve_run(run):
     start_time = time.time()
     best_fitness = None
+    best_fitness = None
+    distance_before_2opt = None
 
     try:
         if run["type"] == "onemax":
-            _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
+            _, best_fitness, _, _ = run_genetic_algorithm(run["population_size"],
                                                        run["gene_length"],
                                                        run["num_generations"],
                                                        run["mutation_rate"],
@@ -258,7 +290,7 @@ def solve_run(run):
                                                        known_optimal=run.get("known_optimal"),
                                                        elite_size=run.get("elite_size"))
         else:
-            _, best_fitness, _ = run_genetic_algorithm(run["population_size"],
+            _, best_fitness, _, distance_before_2opt = run_genetic_algorithm(run["population_size"],
                                                        len(run["cities"]),
                                                        run["num_generations"],
                                                        run["mutation_rate"],
@@ -273,7 +305,7 @@ def solve_run(run):
         print(f"Run {run["run_id"]} failed: {error}")
 
     running_time = time.time() - start_time
-    return run["run_id"], best_fitness, running_time
+    return run["run_id"], best_fitness, running_time, distance_before_2opt
 
 # CHECK IF RUN HAS REACHED OPTIMUM
 def has_reached_optimum(fitness, fitness_function, known_optimal):
