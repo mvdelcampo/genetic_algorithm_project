@@ -107,8 +107,9 @@ def run_all(state):
     state['total_time'] += time.perf_counter() - start_time
 
     runs_by_id = {run['run_id']: run for run in state['runs']}
-    for run_id, best_fitness, running_time, distance_before_2opt in results:
+    for run_id, best_individual, best_fitness, running_time, distance_before_2opt in results:
         run = runs_by_id[run_id]
+        run['best_individual'] = best_individual
         run['best_fitness'] = best_fitness
         run['running_time'] = running_time
         run["distance_before_2opt"] = distance_before_2opt
@@ -164,6 +165,7 @@ def check_status(state):
 
             if run['status'] == 'Finished':
                 print(f"Best fitness: {run['best_fitness']}")
+                print(f"Best individual: {run['best_individual']}")
                 print(f"Running time: {run['running_time']:.4f} seconds")
 
             if run["type"] == "tsp" and run.get("distance_before_2opt") is not None:

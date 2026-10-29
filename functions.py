@@ -279,7 +279,7 @@ def solve_run(run):
 
     try:
         if run["type"] == "onemax":
-            _, best_fitness, _, _ = run_genetic_algorithm(run["population_size"],
+            best_individual, best_fitness, _, _ = run_genetic_algorithm(run["population_size"],
                                                        run["gene_length"],
                                                        run["num_generations"],
                                                        run["mutation_rate"],
@@ -290,7 +290,7 @@ def solve_run(run):
                                                        known_optimal=run.get("known_optimal"),
                                                        elite_size=run.get("elite_size"))
         else:
-            _, best_fitness, _, distance_before_2opt = run_genetic_algorithm(run["population_size"],
+            best_individual, best_fitness, _, distance_before_2opt = run_genetic_algorithm(run["population_size"],
                                                        len(run["cities"]),
                                                        run["num_generations"],
                                                        run["mutation_rate"],
@@ -305,7 +305,7 @@ def solve_run(run):
         print(f"Run {run["run_id"]} failed: {error}")
 
     running_time = time.time() - start_time
-    return run["run_id"], best_fitness, running_time, distance_before_2opt
+    return run["run_id"], best_individual, best_fitness, running_time, distance_before_2opt
 
 # CHECK IF RUN HAS REACHED OPTIMUM
 def has_reached_optimum(fitness, fitness_function, known_optimal):
